@@ -1,17 +1,16 @@
 import axios from 'axios';
 
-// ONLY CHANGED THIS LINE - updated to Render backend URL
-const API_URL = 'https://my-luct-reports.onrender.com/api';
+const API_URL = 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout - KEPT SAME
+  timeout: 10000, // 10 second timeout
 });
 
-// Add auth token to requests - NO CHANGES
+// Add auth token to requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -27,7 +26,7 @@ api.interceptors.request.use(
   }
 );
 
-// Handle auth errors - NO CHANGES
+// Handle auth errors
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ API Success: ${response.config.url}`, response.status);
@@ -62,14 +61,14 @@ api.interceptors.response.use(
   }
 );
 
-// Auth services - NO CHANGES
+// Auth services
 export const authService = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   getProfile: () => api.get('/auth/profile'),
 };
 
-// Report services with rating functionality - NO CHANGES
+// Report services with rating functionality
 export const reportService = {
   getAll: () => api.get('/reports'),
   getById: (id) => api.get(`/reports/${id}`),
@@ -87,7 +86,7 @@ export const reportService = {
   test: () => api.get('/reports/test'),
 };
 
-// Course services - NO CHANGES
+// Course services
 export const courseService = {
   getAll: () => api.get('/courses'),
   create: (courseData) => api.post('/courses', courseData),
@@ -95,7 +94,7 @@ export const courseService = {
   assignLecturer: (id, assignmentData) => api.post(`/courses/${id}/assign`, assignmentData),
 };
 
-// User services - NO CHANGES
+// User services
 export const userService = {
   getAll: () => api.get('/users'),
   getById: (id) => api.get(`/users/${id}`),
@@ -104,7 +103,7 @@ export const userService = {
   delete: (id) => api.delete(`/users/${id}`),
 };
 
-// Class services - NO CHANGES
+// Class services - 🔥 UPDATED: Added missing assignLecturer method
 export const classService = {
   getAll: () => api.get('/classes'),
   getMyClasses: () => api.get('/classes/my-classes'),
@@ -115,7 +114,7 @@ export const classService = {
   assignLecturer: (id, assignmentData) => api.post(`/classes/${id}/assign`, assignmentData),
 };
 
-// 🔥 NEW: Test API connection - NO CHANGES
+// 🔥 NEW: Test API connection
 export const testConnection = async () => {
   try {
     const response = await api.get('/reports/test');
