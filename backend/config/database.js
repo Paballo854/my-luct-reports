@@ -1,132 +1,87 @@
 const mysql = require('mysql2');
 require('dotenv').config();
 
-// Database configuration - REMOVED INVALID OPTIONS
+// Database configuration for FreeSQLDatabase.com
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'luct_reporting_system',
-    port: process.env.DB_PORT || 3307,
+    host: process.env.DB_HOST || 'sql12.freesqldatabase.com',
+    user: process.env.DB_USER || 'sql12802083',
+    password: process.env.DB_PASSWORD || 'YOUR_DATABASE_PASSWORD_HERE',
+    database: process.env.DB_NAME || 'sql12802083',
+    port: process.env.DB_PORT || 3306, // remote MySQL usually uses 3306
     charset: 'utf8mb4',
     timezone: '+00:00'
-    // Removed invalid options: connectTimeout, acquireTimeout, timeout, reconnect
 };
 
-// Create connection pool with valid configuration
+// Create a connection pool
 const pool = mysql.createPool({
     ...dbConfig,
     waitForConnections: true,
-    connectionLimit: 20,
+    connectionLimit: 10,
     queueLimit: 0,
-    acquireTimeout: 60000, // This is valid for pool configuration
-    timeout: 60000, // This is valid for pool configuration
-    idleTimeout: 60000,
+    acquireTimeout: 60000,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0
 });
 
-// Convert to promise-based pool
+// Convert to a promise-based pool
 const promisePool = pool.promise();
 
 // Test database connection
 const testConnection = async () => {
     try {
         const connection = await promisePool.getConnection();
-        console.log('✅ Database connected successfully on port 3307');
-        
-        // Test basic query
-        const [result] = await connection.execute('SELECT 1 as test');
-        console.log('✅ Database test query executed successfully');
-        
+        console.log('✅ Connected to FreeSQLDatabase successfully!');
+        const [rows] = await connection.query('SELECT NOW() AS current_time');
+        console.log('🕒 Database time:', rows[0].current_time);
         connection.release();
-        return true;
-    } catch (error) {
-        console.error('❌ Database connection failed:', error.message);
-        
-        // Provide detailed error information
-        if (error.code === 'ECONNREFUSED') {
-            console.error('Connection refused. Please check:');
-            console.error('1. Is MySQL running in XAMPP on port 3307?');
-            console.error('2. Is the port 3307 correct?');
-            console.error('3. Are the credentials in .env file correct?');
-        } else if (error.code === 'ER_BAD_DB_ERROR') {
-            console.error('Database does not exist. Please create database:', dbConfig.database);
-        } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
-            console.error('Access denied. Please check MySQL username and password.');
+    } catch (err) {
+        console.error('❌ Database connection failed:', err.message);
+        if (err.code === 'ER_ACCESS_DENIED_ERROR') {
+            console.error('→ Invalid username or password.');
+        } else if (err.code === 'ENOTFOUND') {
+            console.error('→ Hostname not reachable. Check DB_HOST.');
+        } else if (err.code === 'ECONNREFUSED') {
+            console.error('→ Connection refused. Remote host may block your IP.');
         }
-        
-        return false;
     }
 };
 
-// Simple health check
-const healthCheck = async () => {
-    try {
-        const [result] = await promisePool.execute('SELECT NOW() as current_time');
-        return {
-            status: 'healthy',
-            timestamp: new Date().toISOString(),
-            database: {
-                name: dbConfig.database,
-                host: dbConfig.host,
-                port: dbConfig.port,
-                current_time: result[0].current_time
-            }
-        };
-    } catch (error) {
-        return {
-            status: 'unhealthy',
-            timestamp: new Date().toISOString(),
-            error: error.message
-        };
-    }
-};
-
-// Simple query wrapper
+// Simple query function
 const query = async (sql, params = []) => {
     try {
         const [results] = await promisePool.execute(sql, params);
         return { success: true, results };
     } catch (error) {
         console.error('Database query error:', error.message);
-        return { 
-            success: false, 
-            error: error.message
-        };
+        return { success: false, error: error.message };
     }
 };
 
-// Close pool gracefully
+// Health check endpoint helper
+const healthCheck = async () => {
+    try {
+        const [rows] = await promisePool.query('SELECT NOW() AS current_time');
+        return { status: 'healthy', time: rows[0].current_time };
+    } catch (error) {
+        return { status: 'unhealthy', error: error.message };
+    }
+};
+
+// Gracefully close pool
 const closePool = async () => {
     try {
         await promisePool.end();
-        console.log('Database connection pool closed successfully');
-    } catch (error) {
-        console.error('Error closing connection pool:', error.message);
+        console.log('🛑 Database pool closed.');
+    } catch (err) {
+        console.error('Error closing pool:', err.message);
     }
 };
 
-// Event listeners for pool monitoring
-pool.on('connection', (connection) => {
-    console.log('New database connection established');
-});
-
-pool.on('enqueue', () => {
-    console.log('Waiting for available connection slot');
-});
-
-// Handle process termination
-process.on('SIGINT', async () => {
-    console.log('Closing database connections...');
-    await closePool();
-    process.exit(0);
-});
-
+// Export
 module.exports = {
     pool: promisePool,
     testConnection,
-    healthCheck,
     query,
+    healthCheck,
     closePool
 };

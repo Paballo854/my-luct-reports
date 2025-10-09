@@ -10,14 +10,19 @@ const authRoutes = require('./routes/auth');
 const reportRoutes = require('./routes/reports');
 const courseRoutes = require('./routes/courses');
 const userRoutes = require('./routes/users');
-const classRoutes = require('./routes/classes'); // Add this line
 
-// Remove classes routes for now since the file doesn't exist
-// const classRoutes = require('./routes/classes');
+// Only import classRoutes if the file exists
+let classRoutes;
+try {
+    classRoutes = require('./routes/classes');
+} catch (error) {
+    console.log('⚠️  Classes routes not found - skipping');
+    classRoutes = null;
+}
 
 const app = express();
 
-// SIMPLE CORS configuration - Remove the problematic options handler
+// SIMPLE CORS configuration
 app.use(cors({
     origin: true, // Allow all origins
     credentials: true
@@ -44,20 +49,33 @@ app.get('/', (req, res) => {
             auth: '/api/auth',
             reports: '/api/reports',
             courses: '/api/courses',
-            users: '/api/users'
-            // Remove classes for now
+            users: '/api/users',
+            classes: classRoutes ? '/api/classes' : 'Not available'
         },
         timestamp: new Date().toISOString()
     });
 });
 
-// API Routes - Only use the routes that exist
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/classes', classRoutes); // Add this line
-// app.use('/api/classes', classRoutes); // Remove this line
+
+// Only use classRoutes if it exists
+if (classRoutes) {
+    app.use('/api/classes', classRoutes);
+}
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        message: 'Server is healthy',
+        timestamp: new Date().toISOString(),
+        database: process.env.DB_NAME || 'luct_reporting_system'
+    });
+});
 
 // 404 handler
 app.use((req, res) => {
@@ -70,7 +88,7 @@ app.use((req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Server Error:', err.stack);
+    console.error('🚨 Server Error:', err.stack);
     res.status(500).json({
         success: false,
         message: 'Internal Server Error',
@@ -86,4 +104,5 @@ app.listen(PORT, () => {
     console.log('🔌 Server Port:', PORT);
     console.log('🌐 URL: http://localhost:' + PORT);
     console.log('🗄️ Database:', process.env.DB_NAME || 'luct_reporting_system');
+    console.log('✅ Available endpoints: /api/auth, /api/reports, /api/courses, /api/users');
 });
